@@ -41,14 +41,22 @@ export interface DayanOption {
 }
 
 /**
- * Weight table for ranking dayan pitches against a song.
- * Tiers are evaluated in order: Sa > vadi > samvadi > everything else present in the raga.
+ * Weight table for ranking dayan pitches against a song. Tiers, highest first:
+ *   1. Sa.
+ *   2. The raga's natural fifth-relation: Pa if the raga has it and emphasises it (vadi or
+ *      samvadi); otherwise shuddha Ma if present; otherwise whichever of the two is present.
+ *   3. Other vadi/samvadi notes, then other notes the raga uses, by consonance.
  */
 export interface Weights {
   sa: number;
+  /** Pa when it is vadi/samvadi, or Ma when Pa is absent or not emphasised. */
+  preferredFifth: number;
+  /** The other of Pa/Ma when the raga has it but it is not the preferred one. */
+  otherFifth: number;
+  /** Vadi/samvadi that is neither Sa, Pa nor Ma. */
   vadi: number;
   samvadi: number;
-  /** Weight for a swara that is in the raga but is neither Sa, vadi nor samvadi, keyed by swara. */
+  /** Any other swara the raga uses, keyed by swara. */
   other: Partial<Record<Swara, number>>;
   /**
    * Intervals (semitones above Sa) that clash with the Sa drone badly enough that a dayan
@@ -98,6 +106,19 @@ export interface OptimizeOptions {
   threshold: number;
   /** Upper bound on drums to consider when searching for the minimum kit. */
   maxK: number;
+}
+
+/** A small change of a song's key that would improve the kit. */
+export interface KeyShift {
+  songIndex: number;
+  from: PitchClass;
+  to: PitchClass;
+  /** Semitones up (+) or down (−). */
+  shift: number;
+  /** The kit after the shift. */
+  kit: KitResult;
+  /** How the shift helps. */
+  effect: 'covers' | 'fewer-drums';
 }
 
 export interface Suggestion {

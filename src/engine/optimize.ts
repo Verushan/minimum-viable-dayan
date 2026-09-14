@@ -1,5 +1,5 @@
 import type {
-  Assignment, Dayan, DayanOption, KitResult, OptimizeOptions, PitchClass, Raga, Song, Suggestion, TunedDayan, Weights,
+  Assignment, Dayan, DayanOption, KeyShift, KitResult, OptimizeOptions, PitchClass, Raga, Song, Suggestion, TunedDayan, Weights,
 } from './types';
 import { ALL_PITCHES, mod12 } from './pitch';
 import { scorePitch } from './scoring';
@@ -15,8 +15,12 @@ export function buildContexts(songs: Song[], ragas: Map<string, Raga>, w: Weight
   return songs.map((song) => {
     const raga = ragas.get(song.ragaId);
     if (!raga) throw new Error(`Unknown raga "${song.ragaId}" for song "${song.name}"`);
-    return { song, raga, byPitch: ALL_PITCHES.map((p) => scorePitch(song, raga, p, w)) };
+    return buildContext(song, raga, w);
   });
+}
+
+function buildContext(song: Song, raga: Raga, w: Weights): SongContext {
+  return { song, raga, byPitch: ALL_PITCHES.map((p) => scorePitch(song, raga, p, w)) };
 }
 
 /** One fixed candidate drum per pitch class — used when the player has not said which drums they own. */
@@ -116,4 +120,44 @@ export function suggestAddition(contexts: SongContext[], kit: KitResult, opts: O
     if (better(r, kit) && (!best || better(r, best.kit))) best = { dayan, kit: r };
   }
   return best;
+}
+
+/**
+ * Suggest small key changes a singer could make so the kit works better. Tries shifting each
+ * song's Sa by up to ±maxShift semitones (nearest first). If the current kit leaves the song
+ * uncovered, a shift that the same drums cover counts; otherwise a shift that reduces the
+ * number of drums needed counts. At most one suggestion per song, the smallest shift that helps.
+ */
+export function suggestKeyShifts(
+  contexts: SongContext[], candidates: Dayan[], kit: KitResult, w: Weights, opts: OptimizeOptions, maxShift = 1,
+): KeyShift[] {
+  const out: KeyShift[] = [];
+  const shifts: number[] = [];
+  for (let d = 1; d <= maxShift; d++) shifts.push(d, -d);
+
+  contexts.forEach((ctx, i) => {
+    const uncovered = kit.assignments[i]!.option.score < opts.threshold;
+    for (const shift of shifts) {
+      const to = mod12(ctx.song.sa + shift);
+      const shifted = contexts.slice();
+      shifted[i] = buildContext({ ...ctx.song, sa: to }, ctx.raga, w);
+
+      if (uncovered) {
+        // Same drums, same tunings — does the song now fit?
+        const r = evaluate(shifted, kit.tuned, kit.picked, opts);
+        if (r.assignments[i]!.option.score >= opts.threshold) {
+          out.push({ songIndex: i, from: ctx.song.sa, to, shift, kit: r, effect: 'covers' });
+          return;
+        }
+      } else if (kit.complete) {
+        // Could the whole set be covered with fewer drums?
+        const r = minimumKit(shifted, candidates, opts);
+        if (r && r.k < kit.k) {
+          out.push({ songIndex: i, from: ctx.song.sa, to, shift, kit: r, effect: 'fewer-drums' });
+          return;
+        }
+      }
+    }
+  });
+  return out;
 }

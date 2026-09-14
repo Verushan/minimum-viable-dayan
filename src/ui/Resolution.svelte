@@ -1,10 +1,12 @@
 <script lang="ts">
   import { RAGA_MAP } from '../data/ragas';
-  import { SWARA_LABEL, pitchName, type KitResult, type PitchClass, type Suggestion } from '../engine';
+  import { SWARA_LABEL, pitchName, type KeyShift, type KitResult, type PitchClass, type Suggestion } from '../engine';
 
-  let { kit, suggestion, threshold, nameStyle, isMinimum, ownedMode }: {
+  let { kit, suggestion, keyShifts, threshold, nameStyle, isMinimum, ownedMode, onapplyshift }: {
     kit: KitResult;
     suggestion: Suggestion | undefined;
+    keyShifts: KeyShift[];
+    onapplyshift: (k: KeyShift) => void;
     threshold: number;
     nameStyle: 'sharp' | 'flat';
     isMinimum: boolean;
@@ -13,6 +15,7 @@
 
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
+  const dir = (n: number) => (n > 0 ? `up ${n === 1 ? 'a semitone' : `${n} semitones`}` : `down ${n === -1 ? 'a semitone' : `${-n} semitones`}`);
 </script>
 
 <section class="resolution" id="resolution">
@@ -44,6 +47,26 @@
     </div>
   {/if}
 
+  {#if keyShifts.length}
+    <div class="shifts">
+      <div class="shifts-title">If the singer can adjust</div>
+      <ul>
+        {#each keyShifts as k (k.songIndex)}
+          {@const song = kit.assignments[k.songIndex]!.song}
+          <li>
+            <span class="shift-text">
+              <strong>{song.name || 'Untitled'}</strong> in <strong>{pn(k.to)}</strong> instead of {pn(k.from)} ({dir(k.shift)})
+              → {k.effect === 'covers'
+                ? `fits the ${pn(k.kit.assignments[k.songIndex]!.tuned.tunedTo)} drum on ${k.kit.assignments[k.songIndex]!.option.reason === 'Sa' ? 'Sa' : SWARA_LABEL[k.kit.assignments[k.songIndex]!.option.swara]}`
+                : `only ${k.kit.k} drum${k.kit.k > 1 ? 's' : ''} needed (${k.kit.tuned.map((t) => pn(t.tunedTo)).join(', ')})`}
+            </span>
+            <button class="no-print" onclick={() => onapplyshift(k)}>Use {pn(k.to)}</button>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
   <ol class="final">
     {#each kit.assignments as a, i}
       {@const compromise = a.option.reason !== 'Sa'}
@@ -57,7 +80,7 @@
         <span class="drum">
           <span class="drum-pitch">{pn(a.tuned.tunedTo)}</span>
           <span class="drum-how">
-            {#if a.option.score === 0}no fit{:else if a.option.reason === 'Sa'}on Sa{:else}{SWARA_LABEL[a.option.swara]} ({a.option.reason.toLowerCase()}){/if}
+            {#if a.option.score === 0}no fit{:else if a.option.reason === 'Sa' || a.option.reason === 'Pa' || a.option.reason === 'Ma'}on {a.option.reason}{:else}{SWARA_LABEL[a.option.swara]} ({a.option.reason.toLowerCase()}){/if}
           </span>
         </span>
       </li>
@@ -86,6 +109,16 @@
     padding: 10px 14px; border-radius: 10px; margin: -4px 0 14px;
     background: var(--accent-soft); color: var(--accent);
   }
+
+  .shifts {
+    padding: 10px 14px; border-radius: 10px; margin: 0 0 14px;
+    background: var(--card); border: 1px dashed var(--line);
+  }
+  .shifts-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+  .shifts ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .shifts li { display: flex; align-items: center; gap: 10px; }
+  .shift-text { flex: 1; min-width: 0; font-size: 0.95rem; }
+  .shifts button { white-space: nowrap; }
 
   .final { list-style: none; margin: 0; padding: 0; }
   .final li {

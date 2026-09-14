@@ -2,8 +2,8 @@
   import { RAGA_MAP } from '../data/ragas';
   import { DEFAULT_WEIGHTS } from '../data/weights';
   import {
-    ALL_PITCHES, SWARA_LABEL, anyDayan, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition,
-    type Dayan, type KitResult, type PitchClass, type Song,
+    ALL_PITCHES, SWARA_LABEL, anyDayan, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition, suggestKeyShifts,
+    type Dayan, type KeyShift, type KitResult, type PitchClass, type Song,
   } from '../engine';
   import RagaPicker from './RagaPicker.svelte';
   import Resolution from './Resolution.svelte';
@@ -41,6 +41,7 @@
     (selectedK && tradeoff.find((r) => r.k === selectedK)) || minimum || tradeoff.at(-1),
   );
   const suggestion = $derived(shown && !shown.complete ? suggestAddition(contexts, shown, opts) : undefined);
+  const keyShifts = $derived<KeyShift[]>(shown ? suggestKeyShifts(contexts, candidates, shown, weights, opts) : []);
 
   $effect(() => { save({ songs, drums, threshold }); });
 
@@ -68,6 +69,10 @@
     selectedK = null;
   }
   function removeDrum(i: number) { drums.splice(i, 1); selectedK = null; }
+  function applyShift(k: KeyShift) {
+    songs[k.songIndex]!.sa = k.to;
+    selectedK = null;
+  }
   function adoptSuggestion() {
     if (suggestion) { drums.push({ ...suggestion.dayan }); drums.sort((a, b) => a.pitch - b.pitch || a.range - b.range); selectedK = null; }
   }
@@ -204,7 +209,7 @@
   {#if !songs.length}
     <p class="muted">Add a song to get started.</p>
   {:else if shown}
-    <Resolution kit={shown} {suggestion} {threshold} {nameStyle} isMinimum={shown === minimum} {ownedMode} />
+    <Resolution kit={shown} {suggestion} {keyShifts} {threshold} {nameStyle} isMinimum={shown === minimum} {ownedMode} onapplyshift={applyShift} />
     {#if suggestion && ownedMode}
       <div class="toolbar no-print" style="margin-top:-6px">
         <button onclick={adoptSuggestion}>Add {pn(suggestion.dayan.pitch)} to my dayans</button>
@@ -243,7 +248,7 @@
         <label>
           <span>Minimum acceptable score per song</span>
           <input type="range" min="0.3" max="1" step="0.05" bind:value={threshold} />
-          <span>{fmt(threshold)} {threshold > weights.vadi ? '(Sa only)' : threshold > weights.samvadi ? '(Sa or vadi)' : threshold > (weights.other.P ?? 0) ? '(Sa, vadi or samvadi)' : ''}</span>
+          <span>{fmt(threshold)} {threshold > weights.preferredFifth ? '(Sa only)' : threshold > weights.otherFifth ? '(Sa, or the raga\'s Pa/Ma)' : threshold > weights.vadi ? '(Sa, Pa or Ma)' : ''}</span>
         </label>
         <label>
           <span>Note names</span>
@@ -254,9 +259,11 @@
         </label>
       </div>
       <p class="muted small">
-        Each pitch is scored as a dayan tuning per song: <strong>Sa</strong> {fmt(weights.sa)},
-        the raga's <strong>vadi</strong> {fmt(weights.vadi)}, <strong>samvadi</strong> {fmt(weights.samvadi)},
-        then other notes the raga uses (Pa {fmt(weights.other.P ?? 0)}, Ma {fmt(weights.other.m ?? 0)}, Ga/Dha {fmt(weights.other.G ?? 0)}, Re/Ni {fmt(weights.other.R ?? 0)}).
+        Each pitch is scored as a dayan tuning per song: <strong>Sa</strong> {fmt(weights.sa)}; then
+        <strong>Pa</strong> if the raga has it as vadi or samvadi, otherwise <strong>Ma</strong> if the raga has it
+        ({fmt(weights.preferredFifth)} — the other of the pair, when present, {fmt(weights.otherFifth)});
+        then any other vadi {fmt(weights.vadi)} / samvadi {fmt(weights.samvadi)}; then remaining notes
+        (Ga/Dha {fmt(weights.other.G ?? 0)}, Re/Ni {fmt(weights.other.R ?? 0)}).
         Omitted notes, and notes a minor 2nd, tritone or major 7th above Sa, score 0.
         Every combination of {ownedMode ? 'your drums' : `up to ${maxK} tunings`} is tried; the kit covering the most songs, then the highest total score, wins.
       </p>

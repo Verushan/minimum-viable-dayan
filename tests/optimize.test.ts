@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anyDayan, buildContexts, bestKitOfSize, kitTradeoff, minimumKit, suggestAddition } from '../src/engine/optimize';
+import { anyDayan, buildContexts, bestKitOfSize, kitTradeoff, minimumKit, suggestAddition, suggestKeyShifts } from '../src/engine/optimize';
 import { parsePitch, pitchName } from '../src/engine/pitch';
 import { RAGA_MAP } from '../src/data/ragas';
 import { DEFAULT_WEIGHTS as W } from '../src/data/weights';
@@ -22,7 +22,7 @@ describe('optimizer with any pitch available', () => {
     const min = minimumKit(ctx, ANY, opts)!;
     expect(min.k).toBe(1);
     expect(names(min)).toEqual(['C#']);
-    expect(min.assignments.map((a) => a.option.reason)).toEqual(['Sa', 'Vadi', 'Sa']);
+    expect(min.assignments.map((a) => a.option.reason)).toEqual(['Sa', 'Ma', 'Sa']);
 
     const two = bestKitOfSize(ctx, ANY, 2, opts);
     expect(names(two)).toEqual(['C#', 'G#']);
@@ -141,5 +141,49 @@ describe('optimizer with the drums the player owns', () => {
     const kit = bestKitOfSize(ctx, owned, 2, opts);
     expect(kit.k).toBe(2);
     expect(kit.picked).toEqual([0, 1]);
+  });
+});
+
+describe('singer key-shift suggestions', () => {
+  it('suggests a semitone shift that lets the owned drums cover an uncovered song', () => {
+    const songs: Song[] = [
+      { name: 'A', sa: P('C#'), ragaId: 'yaman' },
+      { name: 'B', sa: P('D'), ragaId: 'bhupali' }, // no drum fits D
+    ];
+    const ctx = buildContexts(songs, RAGA_MAP, W);
+    const owned = [D('C#')];
+    const kit = kitTradeoff(ctx, owned, opts).at(-1)!;
+    expect(kit.complete).toBe(false);
+    const shifts = suggestKeyShifts(ctx, owned, kit, W, opts);
+    expect(shifts).toHaveLength(1);
+    expect(shifts[0]).toMatchObject({ songIndex: 1, from: P('D'), to: P('C#'), shift: -1, effect: 'covers' });
+    expect(shifts[0]!.kit.complete).toBe(true);
+  });
+
+  it('suggests a shift that reduces the number of drums when any pitch is available', () => {
+    const songs: Song[] = [
+      { name: 'A', sa: P('C#'), ragaId: 'yaman' },
+      { name: 'B', sa: P('D'), ragaId: 'yaman' },
+      { name: 'C', sa: P('C#'), ragaId: 'bhupali' },
+    ];
+    const ctx = buildContexts(songs, RAGA_MAP, W);
+    const kit = minimumKit(ctx, ANY, opts)!;
+    expect(kit.k).toBe(2);
+    const shifts = suggestKeyShifts(ctx, ANY, kit, W, opts);
+    const b = shifts.find((s) => s.songIndex === 1)!;
+    expect(b).toMatchObject({ to: P('C#'), shift: -1, effect: 'fewer-drums' });
+    expect(b.kit.k).toBe(1);
+    // Shifting A or C alone cannot reduce the kit (B still needs D).
+    expect(shifts.map((s) => s.songIndex)).toEqual([1]);
+  });
+
+  it('suggests nothing when one drum already covers everything', () => {
+    const songs: Song[] = [
+      { name: 'A', sa: P('C#'), ragaId: 'yaman' },
+      { name: 'B', sa: P('C#'), ragaId: 'kafi' },
+    ];
+    const ctx = buildContexts(songs, RAGA_MAP, W);
+    const kit = minimumKit(ctx, ANY, opts)!;
+    expect(suggestKeyShifts(ctx, ANY, kit, W, opts)).toEqual([]);
   });
 });
