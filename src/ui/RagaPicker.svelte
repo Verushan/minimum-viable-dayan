@@ -44,7 +44,8 @@
     input?.blur();
   }
   function scrollActiveIntoView() {
-    listEl?.children[active]?.scrollIntoView({ block: 'nearest' });
+    const el = listEl?.children[active] as HTMLElement | undefined;
+    el?.scrollIntoView?.({ block: 'nearest' }); // not implemented in jsdom
   }
   function onkeydown(e: KeyboardEvent) {
     if (!open) { if (e.key === 'ArrowDown' || e.key === 'Enter') { show(); e.preventDefault(); } return; }
