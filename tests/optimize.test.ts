@@ -3,13 +3,13 @@ import { anyDayan, buildContexts, bestKitOfSize, kitTradeoff, minimumKit, sugges
 import { parsePitch, pitchName } from '../src/engine/pitch';
 import { RAGA_MAP } from '../src/data/ragas';
 import { DEFAULT_WEIGHTS as W } from '../src/data/weights';
-import type { Dayan, OptimizeOptions, Song } from '../src/engine/types';
+import type { Dayan, OptimizeOptions, PitchClass, Song } from '../src/engine/types';
 
 const P = (n: string) => parsePitch(n)!;
 const D = (n: string, range = 0): Dayan => ({ pitch: P(n), range });
 const opts: OptimizeOptions = { threshold: 0.7, maxK: 4 };
-const ANY = anyDayan(0);
-const names = (ds: Dayan[]) => ds.map((d) => pitchName(d.pitch, 'sharp')).sort();
+const ANY = anyDayan();
+const names = (kit: { tuned: { tunedTo: PitchClass }[] }) => kit.tuned.map((t) => pitchName(t.tunedTo, 'sharp')).sort();
 
 describe('optimizer with any pitch available', () => {
   it('solves the brief example: one drum at C# suffices, two drums give a perfect score', () => {
@@ -21,11 +21,11 @@ describe('optimizer with any pitch available', () => {
     const ctx = buildContexts(songs, RAGA_MAP, W);
     const min = minimumKit(ctx, ANY, opts)!;
     expect(min.k).toBe(1);
-    expect(names(min.dayans)).toEqual(['C#']);
+    expect(names(min)).toEqual(['C#']);
     expect(min.assignments.map((a) => a.option.reason)).toEqual(['Sa', 'Vadi', 'Sa']);
 
     const two = bestKitOfSize(ctx, ANY, 2, opts);
-    expect(names(two.dayans)).toEqual(['C#', 'G#']);
+    expect(names(two)).toEqual(['C#', 'G#']);
     expect(two.totalScore).toBe(3);
   });
 
@@ -36,7 +36,7 @@ describe('optimizer with any pitch available', () => {
     ];
     const kit = minimumKit(buildContexts(songs, RAGA_MAP, W), ANY, opts)!;
     expect(kit.k).toBe(1);
-    expect(names(kit.dayans)).toEqual(['D']);
+    expect(names(kit)).toEqual(['D']);
   });
 
   it('uses the vadi to share a drum when it clears the threshold', () => {
@@ -46,7 +46,7 @@ describe('optimizer with any pitch available', () => {
     ];
     const kit = minimumKit(buildContexts(songs, RAGA_MAP, W), ANY, opts)!;
     expect(kit.k).toBe(1);
-    expect(names(kit.dayans)).toEqual(['A']);
+    expect(names(kit)).toEqual(['A']);
   });
 
   it('tradeoff table is monotone in score and stops once perfect', () => {
@@ -59,18 +59,6 @@ describe('optimizer with any pitch available', () => {
     for (let i = 1; i < table.length; i++) expect(table[i]!.totalScore).toBeGreaterThanOrEqual(table[i - 1]!.totalScore);
     expect(table.at(-1)!.totalScore).toBe(3);
     expect(table.length).toBe(3);
-  });
-
-  it('retune range lets one drum reach neighbouring Sa', () => {
-    const songs: Song[] = [
-      { name: 'A', sa: P('C#'), ragaId: 'yaman' },
-      { name: 'B', sa: P('D'), ragaId: 'yaman' },
-    ];
-    const ctx = buildContexts(songs, RAGA_MAP, W);
-    expect(minimumKit(ctx, anyDayan(0), opts)!.k).toBe(2);
-    const kit = minimumKit(ctx, anyDayan(1), opts)!;
-    expect(kit.k).toBe(1);
-    expect(kit.assignments.every((a) => a.option.reason === 'Sa')).toBe(true);
   });
 
   it('bestKitOfSize prefers coverage over raw score', () => {
@@ -99,29 +87,42 @@ describe('optimizer with the drums the player owns', () => {
     const best = table.at(-1)!;
     expect(best.complete).toBe(false);
     expect(best.covered).toBe(2);
-    expect(best.dayans.every((d) => owned.includes(d))).toBe(true);
+    expect(best.tuned.every((t) => owned.includes(t.dayan))).toBe(true);
     expect(best.assignments[1]!.option.score).toBeLessThan(opts.threshold);
   });
 
-  it('per-drum retune range is honoured', () => {
-    // C# ±1 reaches D, which is Sa for B and vadi (Pa) for C — one drum covers all three.
+  it('a drum with range is set to one pitch for the whole session, not retuned per song', () => {
+    // C# ±1 can be set to C# (covers A) or D (covers B) — but not both, since the drum does
+    // not move between songs. Either way one song is left without a fit.
     const owned = [D('C#', 1), D('G')];
-    const kit = minimumKit(ctx, owned, opts)!;
+    const kit = bestKitOfSize(ctx, owned, 2, opts);
+    expect(kit.complete).toBe(false);
+    expect(kit.covered).toBe(2);
+    const cs = kit.tuned.find((t) => t.dayan === owned[0])!;
+    expect([P('C#'), P('D')]).toContain(cs.tunedTo);
+    expect(kit.assignments.filter((a) => a.option.score === 0)).toHaveLength(1);
+    // Each drum serves every song at its one session pitch.
+    for (const a of kit.assignments) expect(a.tuned.tunedTo).toBe(a.tuned.dayan === owned[0] ? cs.tunedTo : P('G'));
+  });
+
+  it('range lets a drum be set to a neighbouring Sa when that covers more', () => {
+    const songs2: Song[] = [
+      { name: 'A', sa: P('D'), ragaId: 'yaman' },
+      { name: 'B', sa: P('D'), ragaId: 'bhairavi' },
+    ];
+    const ctx2 = buildContexts(songs2, RAGA_MAP, W);
+    expect(minimumKit(ctx2, [D('C#')], opts)).toBeUndefined();
+    const kit = minimumKit(ctx2, [D('C#', 1)], opts)!;
     expect(kit.k).toBe(1);
-    expect(kit.dayans[0]).toBe(owned[0]);
-    const b = kit.assignments[1]!;
-    expect(b.playedAt).toBe(P('D'));
-    expect(b.option.reason).toBe('Sa');
-    expect(kit.assignments[2]!.playedAt).toBe(P('D'));
-    // Without the range, the same two drums leave B uncovered.
-    expect(minimumKit(ctx, [D('C#'), D('G')], opts)).toBeUndefined();
+    expect(kit.tuned[0]!.tunedTo).toBe(P('D'));
+    expect(kit.assignments.every((a) => a.option.reason === 'Sa')).toBe(true);
   });
 
   it('suggests the one extra drum that closes the gap', () => {
     const owned = [D('C#'), D('G')];
     const kit = kitTradeoff(ctx, owned, opts).at(-1)!;
     expect(kit.complete).toBe(false);
-    const s = suggestAddition(ctx, kit, 0, opts)!;
+    const s = suggestAddition(ctx, kit, opts)!;
     expect(pitchName(s.dayan.pitch, 'sharp')).toBe('D');
     expect(s.kit.complete).toBe(true);
   });
@@ -132,7 +133,7 @@ describe('optimizer with the drums the player owns', () => {
     expect(table[1]!.complete).toBe(true); // {C#, D}: C rides on its vadi
     const perfect = table.at(-1)!;
     expect(perfect.totalScore).toBe(3);
-    expect(suggestAddition(ctx, perfect, 0, opts)).toBeUndefined();
+    expect(suggestAddition(ctx, perfect, opts)).toBeUndefined();
   });
 
   it('allows two drums of the same pitch with different ranges', () => {

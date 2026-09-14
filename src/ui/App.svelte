@@ -17,8 +17,8 @@
   ]);
   let drums = $state<Dayan[]>(initial?.drums ?? []);
   let threshold = $state(initial?.threshold ?? 0.7);
-  let retuneRange = $state(initial?.retuneRange ?? 0);
   let newDrumPitch = $state<PitchClass>(1);
+  let newDrumRange = $state(0);
   let nameStyle = $state<'sharp' | 'flat'>('sharp');
   let selectedK = $state<number | null>(null);
   let showJson = $state(false);
@@ -31,7 +31,7 @@
   const maxK = 4;
 
   const ownedMode = $derived(drums.length > 0);
-  const candidates = $derived<Dayan[]>(ownedMode ? drums : anyDayan(retuneRange));
+  const candidates = $derived<Dayan[]>(ownedMode ? drums : anyDayan());
   const opts = $derived({ threshold, maxK: ownedMode ? drums.length : maxK });
   const contexts = $derived(buildContexts(songs, RAGA_MAP, weights));
   const tradeoff = $derived<KitResult[]>(songs.length ? kitTradeoff(contexts, candidates, opts) : []);
@@ -39,9 +39,9 @@
   const shown = $derived<KitResult | undefined>(
     (selectedK && tradeoff.find((r) => r.k === selectedK)) || minimum || tradeoff.at(-1),
   );
-  const suggestion = $derived(shown && !shown.complete ? suggestAddition(contexts, shown, retuneRange, opts) : undefined);
+  const suggestion = $derived(shown && !shown.complete ? suggestAddition(contexts, shown, opts) : undefined);
 
-  $effect(() => { save({ songs, drums, threshold, retuneRange }); });
+  $effect(() => { save({ songs, drums, threshold }); });
 
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
@@ -62,7 +62,7 @@
   }
 
   function addDrum() {
-    drums.push({ pitch: newDrumPitch, range: retuneRange });
+    drums.push({ pitch: newDrumPitch, range: newDrumRange });
     drums.sort((a, b) => a.pitch - b.pitch || a.range - b.range);
     selectedK = null;
   }
@@ -72,7 +72,7 @@
   }
 
   function openJson() {
-    jsonText = JSON.stringify({ songs, drums, threshold, retuneRange }, null, 2);
+    jsonText = JSON.stringify({ songs, drums, threshold }, null, 2);
     jsonError = '';
     showJson = true;
   }
@@ -83,14 +83,13 @@
       songs = parsed.songs;
       drums = parsed.drums;
       threshold = parsed.threshold;
-      retuneRange = parsed.retuneRange;
       showJson = false;
     } catch (e) {
       jsonError = (e as Error).message;
     }
   }
   async function copyLink() {
-    await navigator.clipboard.writeText(shareUrl({ songs, drums, threshold, retuneRange }));
+    await navigator.clipboard.writeText(shareUrl({ songs, drums, threshold }));
     copied = true;
     setTimeout(() => (copied = false), 1500);
   }
@@ -146,7 +145,7 @@
           <div class="options-row">
             <span class="muted">Dayan options:</span>
             {#each ranked as o}
-              <span class="pill {reasonClass(o.reason)}" class:chosen={chosen?.playedAt === o.pitch}
+              <span class="pill {reasonClass(o.reason)}" class:chosen={chosen?.tuned.tunedTo === o.pitch}
                 title="{SWARA_LABEL[o.swara]} of {pn(song.sa)} · {fmt(o.score)}">
                 {pn(o.pitch)}<small>{o.reason}</small>
               </span>
@@ -180,23 +179,29 @@
         {#each drums as d, i (i)}
           <li class="drum-chip">
             <span class="drum-chip-pitch">{pn(d.pitch)}</span>
-            <select bind:value={d.range} aria-label="Retune range" onchange={() => (selectedK = null)}>
-              <option value={0}>fixed</option>
-              <option value={1}>±1 semitone</option>
-              <option value={2}>±2 semitones</option>
-              <option value={3}>±3 semitones</option>
+            <select bind:value={d.range} aria-label="Tuning range" onchange={() => (selectedK = null)}>
+              <option value={0}>fixed pitch</option>
+              <option value={1}>can set ±1</option>
+              <option value={2}>can set ±2</option>
+              <option value={3}>can set ±3</option>
             </select>
             <button class="ghost no-print" onclick={() => removeDrum(i)} title="Remove" aria-label="Remove drum">✕</button>
           </li>
         {/each}
       </ul>
-      <p class="muted small">Only these drums will be suggested. Remove them all to let the tool pick any tuning.</p>
+      <p class="muted small">Only these drums will be suggested. A drum with a range is set to one pitch before the session and stays there — no retuning between songs. Remove all drums to let the tool pick any tuning.</p>
     {:else}
       <p class="muted small">No drums entered — any tuning will be suggested. Add the dayans you own to plan around them.</p>
     {/if}
     <div class="add-drum no-print">
       <select bind:value={newDrumPitch} aria-label="Pitch of drum to add">
         {#each ALL_PITCHES as p}<option value={p}>{pn(p)}</option>{/each}
+      </select>
+      <select bind:value={newDrumRange} aria-label="Tuning range of drum to add">
+        <option value={0}>fixed pitch</option>
+        <option value={1}>can set ±1</option>
+        <option value={2}>can set ±2</option>
+        <option value={3}>can set ±3</option>
       </select>
       <button class="primary" onclick={addDrum}>+ Add dayan</button>
     </div>
@@ -221,7 +226,7 @@
             {#each tradeoff as r}
               <tr class:active={shown.k === r.k} onclick={() => (selectedK = r.k)}>
                 <td>{r.k}</td>
-                <td>{r.dayans.map((d) => pn(d.pitch)).join(', ')}</td>
+                <td>{r.tuned.map((t) => pn(t.tunedTo)).join(', ')}</td>
                 <td>{r.covered}/{songs.length}{r === minimum ? ' ✓' : ''}</td>
                 <td>{fmt(r.totalScore)}</td>
               </tr>
@@ -247,15 +252,6 @@
           <span>{fmt(threshold)} {threshold > weights.vadi ? '(Sa only)' : threshold > weights.samvadi ? '(Sa or vadi)' : threshold > (weights.other.P ?? 0) ? '(Sa, vadi or samvadi)' : ''}</span>
         </label>
         <label>
-          <span>{ownedMode ? 'Retune range for new / suggested drums' : 'Drum retune range'}</span>
-          <select bind:value={retuneRange}>
-            <option value={0}>Exact pitch only</option>
-            <option value={1}>± 1 semitone</option>
-            <option value={2}>± 2 semitones</option>
-            <option value={3}>± 3 semitones</option>
-          </select>
-        </label>
-        <label>
           <span>Note names</span>
           <select bind:value={nameStyle}>
             <option value="sharp">Sharps (C#)</option>
@@ -276,7 +272,7 @@
   {#if shown}
     <a class="sticky-kit no-print" href="#resolution">
       <span class="sticky-label">Carry</span>
-      {#each shown.dayans as d}<span class="sticky-pitch">{pn(d.pitch)}</span>{/each}
+      {#each shown.tuned as t}<span class="sticky-pitch">{pn(t.tunedTo)}</span>{/each}
       <span class="sticky-more">{shown.complete ? 'all songs covered' : `${shown.covered}/${songs.length} covered`} ›</span>
     </a>
   {/if}

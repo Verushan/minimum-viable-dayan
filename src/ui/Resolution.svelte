@@ -13,7 +13,6 @@
 
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
-  const rangeLabel = (r: number) => (r ? ` ±${r}` : '');
 </script>
 
 <section class="resolution" id="resolution">
@@ -21,7 +20,12 @@
   <div class="kit-banner" class:incomplete={!kit.complete}>
     <div class="kit-label">{ownedMode ? 'Bring these dayans' : 'Dayans to carry'}</div>
     <div class="kit-pitches">
-      {#each kit.dayans as d}<span class="kit-pitch">{pn(d.pitch)}<small>{rangeLabel(d.range)}</small></span>{/each}
+      {#each kit.tuned as t}
+        <span class="kit-pitch">
+          {pn(t.tunedTo)}
+          {#if t.tunedTo !== t.dayan.pitch}<small>{pn(t.dayan.pitch)} drum, set to {pn(t.tunedTo)}</small>{/if}
+        </span>
+      {/each}
     </div>
     <div class="kit-note">
       {#if kit.complete}
@@ -34,7 +38,7 @@
 
   {#if !kit.complete && suggestion}
     <div class="suggest">
-      <strong>Adding a {pn(suggestion.dayan.pitch)}{rangeLabel(suggestion.dayan.range)} dayan</strong>
+      <strong>Adding a {pn(suggestion.dayan.pitch)} dayan</strong>
       would {suggestion.kit.complete ? 'cover every song' : `cover ${suggestion.kit.covered} of ${kit.assignments.length}`}
       ({suggestion.kit.covered - kit.covered > 0 ? `+${suggestion.kit.covered - kit.covered} song${suggestion.kit.covered - kit.covered > 1 ? 's' : ''}, ` : ''}score {fmt(kit.totalScore)} → {fmt(suggestion.kit.totalScore)}).
     </div>
@@ -51,9 +55,8 @@
           <span class="meta">Sa {pn(a.song.sa)} · {RAGA_MAP.get(a.song.ragaId)?.name}</span>
         </span>
         <span class="drum">
-          <span class="drum-pitch">{pn(a.playedAt)}</span>
+          <span class="drum-pitch">{pn(a.tuned.tunedTo)}</span>
           <span class="drum-how">
-            {#if a.playedAt !== a.dayan.pitch}{pn(a.dayan.pitch)} drum retuned · {/if}
             {#if a.option.score === 0}no fit{:else if a.option.reason === 'Sa'}on Sa{:else}{SWARA_LABEL[a.option.swara]} ({a.option.reason.toLowerCase()}){/if}
           </span>
         </span>
@@ -76,7 +79,8 @@
     font-size: 2rem; font-weight: 700; line-height: 1;
     padding: 8px 14px; border-radius: 10px; background: var(--bg); color: var(--fg);
   }
-  .kit-pitch small { font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+  .kit-pitch { display: flex; flex-direction: column; align-items: center; }
+  .kit-pitch small { font-size: 0.7rem; font-weight: 500; color: var(--muted); white-space: nowrap; }
   .kit-note { flex: 1; min-width: 12em; }
   .suggest {
     padding: 10px 14px; border-radius: 10px; margin: -4px 0 14px;

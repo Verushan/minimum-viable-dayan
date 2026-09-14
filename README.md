@@ -18,9 +18,10 @@ size, the kit that covers the most songs above a threshold (default 0.70) with t
 score.
 
 - **No drums entered:** any of the 12 tunings may be suggested (up to 4 drums).
-- **Your dayans entered:** only those drums are considered, each with its own retune range
-  (fixed, ±1, ±2, ±3 semitones). If they can't cover the set, the tool names the single extra
-  drum that would help most.
+- **Your dayans entered:** only those drums are considered. A drum's range (fixed, ±1, ±2, ±3
+  semitones) is how far it can be *set* before the session; it then stays at one pitch for every
+  song — no retuning between songs is assumed. If the drums can't cover the set, the tool names
+  the single extra drum that would help most.
 
 Weights live in `src/data/weights.ts`; ragas in `src/data/ragas.ts` (add entries there — a test
 validates every entry).

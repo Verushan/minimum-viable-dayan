@@ -58,23 +58,31 @@ export interface Weights {
 }
 
 export interface Dayan {
-  /** Nominal pitch the drum is tuned to. */
+  /** Nominal pitch of the drum. */
   pitch: PitchClass;
-  /** How many semitones this drum can be retuned up or down from its nominal pitch. */
+  /**
+   * How many semitones the drum can be set up or down from its nominal pitch before the
+   * session. It then stays there for every song — no retuning between songs is assumed.
+   */
   range: number;
+}
+
+/** A drum set to one specific pitch for the whole session. */
+export interface TunedDayan {
+  dayan: Dayan;
+  tunedTo: PitchClass;
 }
 
 export interface Assignment {
   song: Song;
-  dayan: Dayan;
-  /** The pitch actually played (== dayan.pitch unless retune range > 0). */
-  playedAt: PitchClass;
+  tuned: TunedDayan;
   option: DayanOption;
 }
 
 export interface KitResult {
   k: number;
-  dayans: Dayan[];
+  /** The drums to bring, each with the pitch to set it to. */
+  tuned: TunedDayan[];
   /** Indices into the candidate list the kit was chosen from. */
   picked: number[];
   assignments: Assignment[];
@@ -93,7 +101,7 @@ export interface OptimizeOptions {
 }
 
 export interface Suggestion {
-  /** The drum to add to the kit. */
+  /** The (fixed-pitch) drum to add to the kit. */
   dayan: Dayan;
   /** The kit with that drum added. */
   kit: KitResult;

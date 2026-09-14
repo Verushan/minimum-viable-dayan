@@ -6,8 +6,6 @@ export interface SavedState {
   /** Drums the player owns; empty means "any tuning may be suggested". */
   drums: Dayan[];
   threshold: number;
-  /** Retune range assumed for drums when none are owned, and for newly added drums. */
-  retuneRange: number;
 }
 
 const LS_KEY = 'mvd:state';
@@ -35,7 +33,6 @@ export function parseState(raw: unknown): SavedState | undefined {
     songs: r.songs.map((s) => ({ name: s.name, sa: s.sa, ragaId: s.ragaId })),
     drums: drums.map((d) => ({ pitch: d.pitch, range: d.range })),
     threshold: typeof r.threshold === 'number' ? r.threshold : 0.7,
-    retuneRange: typeof r.retuneRange === 'number' ? r.retuneRange : 0,
   };
 }
 
