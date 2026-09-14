@@ -5,7 +5,9 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/minimum-viable-dayan/',
   plugins: [svelte()],
+  // Component tests run in jsdom and need Svelte's client build, not the SSR one.
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.svelte.ts'],
   },
 });

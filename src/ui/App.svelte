@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { RAGAS, RAGA_MAP } from '../data/ragas';
+  import { RAGA_MAP } from '../data/ragas';
   import { DEFAULT_WEIGHTS } from '../data/weights';
   import {
     ALL_PITCHES, SWARA_LABEL, anyDayan, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition,
     type Dayan, type KitResult, type PitchClass, type Song,
   } from '../engine';
+  import RagaPicker from './RagaPicker.svelte';
   import Resolution from './Resolution.svelte';
   import { load, parseState, save, shareUrl } from './persist';
 
@@ -94,11 +95,6 @@
     setTimeout(() => (copied = false), 1500);
   }
 
-  /** Dropdown label: Hindustani name plus short aliases. */
-  function ragaLabel(r: { name: string; aliases?: string[] }) {
-    const short = (r.aliases ?? []).slice(0, 2);
-    return short.length ? `${r.name} (${short.join(', ')})` : r.name;
-  }
   function reasonClass(reason: string) {
     return reason === 'Sa' ? 'sa' : reason === 'Vadi' ? 'vadi' : reason === 'Samvadi' ? 'samvadi' : '';
   }
@@ -136,9 +132,7 @@
             </label>
             <label class="grow">
               <span>Raga</span>
-              <select bind:value={song.ragaId}>
-                {#each RAGAS as r}<option value={r.id}>{ragaLabel(r)}</option>{/each}
-              </select>
+              <RagaPicker bind:value={song.ragaId} />
             </label>
           </div>
           {#if raga.notes}<div class="raga-note">{raga.notes}</div>{/if}
