@@ -1,24 +1,27 @@
 <script lang="ts">
   import { RAGA_MAP } from '../data/ragas';
-  import { SWARA_LABEL, pitchName, type KitResult, type PitchClass } from '../engine';
+  import { SWARA_LABEL, pitchName, type KitResult, type PitchClass, type Suggestion } from '../engine';
 
-  let { kit, threshold, nameStyle, isMinimum }: {
+  let { kit, suggestion, threshold, nameStyle, isMinimum, ownedMode }: {
     kit: KitResult;
+    suggestion: Suggestion | undefined;
     threshold: number;
     nameStyle: 'sharp' | 'flat';
     isMinimum: boolean;
+    ownedMode: boolean;
   } = $props();
 
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
+  const rangeLabel = (r: number) => (r ? ` ±${r}` : '');
 </script>
 
 <section class="resolution" id="resolution">
   <h2>Final setlist</h2>
   <div class="kit-banner" class:incomplete={!kit.complete}>
-    <div class="kit-label">Dayans to carry</div>
+    <div class="kit-label">{ownedMode ? 'Bring these dayans' : 'Dayans to carry'}</div>
     <div class="kit-pitches">
-      {#each kit.dayans as d}<span class="kit-pitch">{pn(d.pitch)}</span>{/each}
+      {#each kit.dayans as d}<span class="kit-pitch">{pn(d.pitch)}<small>{rangeLabel(d.range)}</small></span>{/each}
     </div>
     <div class="kit-note">
       {#if kit.complete}
@@ -28,6 +31,14 @@
       {/if}
     </div>
   </div>
+
+  {#if !kit.complete && suggestion}
+    <div class="suggest">
+      <strong>Adding a {pn(suggestion.dayan.pitch)}{rangeLabel(suggestion.dayan.range)} dayan</strong>
+      would {suggestion.kit.complete ? 'cover every song' : `cover ${suggestion.kit.covered} of ${kit.assignments.length}`}
+      ({suggestion.kit.covered - kit.covered > 0 ? `+${suggestion.kit.covered - kit.covered} song${suggestion.kit.covered - kit.covered > 1 ? 's' : ''}, ` : ''}score {fmt(kit.totalScore)} → {fmt(suggestion.kit.totalScore)}).
+    </div>
+  {/if}
 
   <ol class="final">
     {#each kit.assignments as a, i}
@@ -40,10 +51,10 @@
           <span class="meta">Sa {pn(a.song.sa)} · {RAGA_MAP.get(a.song.ragaId)?.name}</span>
         </span>
         <span class="drum">
-          <span class="drum-pitch">{pn(a.dayan.pitch)}</span>
+          <span class="drum-pitch">{pn(a.playedAt)}</span>
           <span class="drum-how">
-            {#if a.playedAt !== a.dayan.pitch}retune to {pn(a.playedAt)} · {/if}
-            {a.option.reason === 'Sa' ? 'on Sa' : `${SWARA_LABEL[a.option.swara]} (${a.option.reason.toLowerCase()})`}
+            {#if a.playedAt !== a.dayan.pitch}{pn(a.dayan.pitch)} drum retuned · {/if}
+            {#if a.option.score === 0}no fit{:else if a.option.reason === 'Sa'}on Sa{:else}{SWARA_LABEL[a.option.swara]} ({a.option.reason.toLowerCase()}){/if}
           </span>
         </span>
       </li>
@@ -65,7 +76,12 @@
     font-size: 2rem; font-weight: 700; line-height: 1;
     padding: 8px 14px; border-radius: 10px; background: var(--bg); color: var(--fg);
   }
+  .kit-pitch small { font-size: 0.9rem; font-weight: 500; color: var(--muted); }
   .kit-note { flex: 1; min-width: 12em; }
+  .suggest {
+    padding: 10px 14px; border-radius: 10px; margin: -4px 0 14px;
+    background: var(--accent-soft); color: var(--accent);
+  }
 
   .final { list-style: none; margin: 0; padding: 0; }
   .final li {

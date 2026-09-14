@@ -1,28 +1,39 @@
-import type { PitchClass, Song } from '../engine/types';
+import type { Dayan, PitchClass, Song } from '../engine/types';
 import { RAGA_MAP } from '../data/ragas';
 
 export interface SavedState {
   songs: Song[];
+  /** Drums the player owns; empty means "any tuning may be suggested". */
+  drums: Dayan[];
   threshold: number;
+  /** Retune range assumed for drums when none are owned, and for newly added drums. */
   retuneRange: number;
 }
 
 const LS_KEY = 'mvd:state';
 
+const isPitch = (x: unknown): x is PitchClass => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x < 12;
+
 function isSong(x: unknown): x is Song {
   if (typeof x !== 'object' || x === null) return false;
   const s = x as Record<string, unknown>;
-  return typeof s.name === 'string'
-    && typeof s.sa === 'number' && Number.isInteger(s.sa) && s.sa >= 0 && s.sa < 12
-    && typeof s.ragaId === 'string' && RAGA_MAP.has(s.ragaId);
+  return typeof s.name === 'string' && isPitch(s.sa) && typeof s.ragaId === 'string' && RAGA_MAP.has(s.ragaId);
+}
+
+function isDayan(x: unknown): x is Dayan {
+  if (typeof x !== 'object' || x === null) return false;
+  const d = x as Record<string, unknown>;
+  return isPitch(d.pitch) && typeof d.range === 'number' && d.range >= 0 && d.range <= 6;
 }
 
 export function parseState(raw: unknown): SavedState | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const r = raw as Record<string, unknown>;
   if (!Array.isArray(r.songs) || !r.songs.every(isSong)) return undefined;
+  const drums = Array.isArray(r.drums) && r.drums.every(isDayan) ? r.drums : [];
   return {
-    songs: r.songs.map((s) => ({ name: s.name, sa: s.sa as PitchClass, ragaId: s.ragaId })),
+    songs: r.songs.map((s) => ({ name: s.name, sa: s.sa, ragaId: s.ragaId })),
+    drums: drums.map((d) => ({ pitch: d.pitch, range: d.range })),
     threshold: typeof r.threshold === 'number' ? r.threshold : 0.7,
     retuneRange: typeof r.retuneRange === 'number' ? r.retuneRange : 0,
   };

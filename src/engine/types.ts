@@ -60,6 +60,8 @@ export interface Weights {
 export interface Dayan {
   /** Nominal pitch the drum is tuned to. */
   pitch: PitchClass;
+  /** How many semitones this drum can be retuned up or down from its nominal pitch. */
+  range: number;
 }
 
 export interface Assignment {
@@ -73,6 +75,8 @@ export interface Assignment {
 export interface KitResult {
   k: number;
   dayans: Dayan[];
+  /** Indices into the candidate list the kit was chosen from. */
+  picked: number[];
   assignments: Assignment[];
   totalScore: number;
   /** Number of songs whose best available score is >= the threshold. */
@@ -84,8 +88,13 @@ export interface KitResult {
 export interface OptimizeOptions {
   /** Minimum acceptable per-song score for a song to count as covered. */
   threshold: number;
-  /** How many semitones a physical drum can be retuned up or down from its nominal pitch. */
-  retuneRange: number;
   /** Upper bound on drums to consider when searching for the minimum kit. */
   maxK: number;
+}
+
+export interface Suggestion {
+  /** The drum to add to the kit. */
+  dayan: Dayan;
+  /** The kit with that drum added. */
+  kit: KitResult;
 }

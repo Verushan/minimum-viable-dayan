@@ -13,9 +13,14 @@ as a dayan tuning:
 | Other | 0.55 Pa · 0.45 Ma · 0.30 Ga/Dha · 0.15 Re/Ni | any other note the raga uses |
 | Forbidden | 0 | notes the raga omits, or a minor 2nd / tritone / major 7th above Sa |
 
-The optimizer then brute-forces every combination of up to 4 tunings and reports, for each kit size,
-the kit that covers the most songs above a threshold (default 0.70) with the highest total score.
-Optionally a drum may be treated as retunable ±1–2 semitones.
+The optimizer then brute-forces every combination of candidate drums and reports, for each kit
+size, the kit that covers the most songs above a threshold (default 0.70) with the highest total
+score.
+
+- **No drums entered:** any of the 12 tunings may be suggested (up to 4 drums).
+- **Your dayans entered:** only those drums are considered, each with its own retune range
+  (fixed, ±1, ±2, ±3 semitones). If they can't cover the set, the tool names the single extra
+  drum that would help most.
 
 Weights live in `src/data/weights.ts`; ragas in `src/data/ragas.ts` (add entries there — a test
 validates every entry).

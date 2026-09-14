@@ -2,8 +2,8 @@
   import { RAGAS, RAGA_MAP } from '../data/ragas';
   import { DEFAULT_WEIGHTS } from '../data/weights';
   import {
-    ALL_PITCHES, SWARA_LABEL, buildContexts, kitTradeoff, pitchName, rankDayans,
-    type KitResult, type PitchClass, type Song,
+    ALL_PITCHES, SWARA_LABEL, anyDayan, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition,
+    type Dayan, type KitResult, type PitchClass, type Song,
   } from '../engine';
   import Resolution from './Resolution.svelte';
   import { load, parseState, save, shareUrl } from './persist';
@@ -15,8 +15,10 @@
     { name: 'Bhajan B', sa: 8, ragaId: 'malkauns' },
     { name: 'Bhajan C', sa: 1, ragaId: 'marwa' },
   ]);
+  let drums = $state<Dayan[]>(initial?.drums ?? []);
   let threshold = $state(initial?.threshold ?? 0.7);
   let retuneRange = $state(initial?.retuneRange ?? 0);
+  let newDrumPitch = $state<PitchClass>(1);
   let nameStyle = $state<'sharp' | 'flat'>('sharp');
   let selectedK = $state<number | null>(null);
   let showJson = $state(false);
@@ -28,14 +30,18 @@
   const weights = DEFAULT_WEIGHTS;
   const maxK = 4;
 
+  const ownedMode = $derived(drums.length > 0);
+  const candidates = $derived<Dayan[]>(ownedMode ? drums : anyDayan(retuneRange));
+  const opts = $derived({ threshold, maxK: ownedMode ? drums.length : maxK });
   const contexts = $derived(buildContexts(songs, RAGA_MAP, weights));
-  const tradeoff = $derived<KitResult[]>(songs.length ? kitTradeoff(contexts, { threshold, retuneRange, maxK }) : []);
+  const tradeoff = $derived<KitResult[]>(songs.length ? kitTradeoff(contexts, candidates, opts) : []);
   const minimum = $derived(tradeoff.find((r) => r.complete));
   const shown = $derived<KitResult | undefined>(
     (selectedK && tradeoff.find((r) => r.k === selectedK)) || minimum || tradeoff.at(-1),
   );
+  const suggestion = $derived(shown && !shown.complete ? suggestAddition(contexts, shown, retuneRange, opts) : undefined);
 
-  $effect(() => { save({ songs, threshold, retuneRange }); });
+  $effect(() => { save({ songs, drums, threshold, retuneRange }); });
 
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
@@ -55,8 +61,18 @@
     [songs[i], songs[j]] = [songs[j]!, songs[i]!];
   }
 
+  function addDrum() {
+    drums.push({ pitch: newDrumPitch, range: retuneRange });
+    drums.sort((a, b) => a.pitch - b.pitch || a.range - b.range);
+    selectedK = null;
+  }
+  function removeDrum(i: number) { drums.splice(i, 1); selectedK = null; }
+  function adoptSuggestion() {
+    if (suggestion) { drums.push({ ...suggestion.dayan }); drums.sort((a, b) => a.pitch - b.pitch || a.range - b.range); selectedK = null; }
+  }
+
   function openJson() {
-    jsonText = JSON.stringify({ songs, threshold, retuneRange }, null, 2);
+    jsonText = JSON.stringify({ songs, drums, threshold, retuneRange }, null, 2);
     jsonError = '';
     showJson = true;
   }
@@ -65,6 +81,7 @@
       const parsed = parseState(JSON.parse(jsonText));
       if (!parsed) throw new Error('Expected { songs: [{ name, sa: 0-11, ragaId }] } with known raga ids.');
       songs = parsed.songs;
+      drums = parsed.drums;
       threshold = parsed.threshold;
       retuneRange = parsed.retuneRange;
       showJson = false;
@@ -73,7 +90,7 @@
     }
   }
   async function copyLink() {
-    await navigator.clipboard.writeText(shareUrl({ songs, threshold, retuneRange }));
+    await navigator.clipboard.writeText(shareUrl({ songs, drums, threshold, retuneRange }));
     copied = true;
     setTimeout(() => (copied = false), 1500);
   }
@@ -156,10 +173,44 @@
     {/if}
   </section>
 
+  <section>
+    <h2>Your dayans <span class="muted">({drums.length || 'none'})</span></h2>
+    {#if drums.length}
+      <ul class="drums">
+        {#each drums as d, i (i)}
+          <li class="drum-chip">
+            <span class="drum-chip-pitch">{pn(d.pitch)}</span>
+            <select bind:value={d.range} aria-label="Retune range" onchange={() => (selectedK = null)}>
+              <option value={0}>fixed</option>
+              <option value={1}>±1 semitone</option>
+              <option value={2}>±2 semitones</option>
+              <option value={3}>±3 semitones</option>
+            </select>
+            <button class="ghost no-print" onclick={() => removeDrum(i)} title="Remove" aria-label="Remove drum">✕</button>
+          </li>
+        {/each}
+      </ul>
+      <p class="muted small">Only these drums will be suggested. Remove them all to let the tool pick any tuning.</p>
+    {:else}
+      <p class="muted small">No drums entered — any tuning will be suggested. Add the dayans you own to plan around them.</p>
+    {/if}
+    <div class="add-drum no-print">
+      <select bind:value={newDrumPitch} aria-label="Pitch of drum to add">
+        {#each ALL_PITCHES as p}<option value={p}>{pn(p)}</option>{/each}
+      </select>
+      <button class="primary" onclick={addDrum}>+ Add dayan</button>
+    </div>
+  </section>
+
   {#if !songs.length}
     <p class="muted">Add a song to get started.</p>
   {:else if shown}
-    <Resolution kit={shown} {threshold} {nameStyle} isMinimum={shown === minimum} />
+    <Resolution kit={shown} {suggestion} {threshold} {nameStyle} isMinimum={shown === minimum} {ownedMode} />
+    {#if suggestion && ownedMode}
+      <div class="toolbar no-print" style="margin-top:-6px">
+        <button onclick={adoptSuggestion}>Add {pn(suggestion.dayan.pitch)} to my dayans</button>
+      </div>
+    {/if}
 
     <section class="no-print">
       <h2>More or fewer drums</h2>
@@ -196,11 +247,12 @@
           <span>{fmt(threshold)} {threshold > weights.vadi ? '(Sa only)' : threshold > weights.samvadi ? '(Sa or vadi)' : threshold > (weights.other.P ?? 0) ? '(Sa, vadi or samvadi)' : ''}</span>
         </label>
         <label>
-          <span>Drum retune range</span>
+          <span>{ownedMode ? 'Retune range for new / suggested drums' : 'Drum retune range'}</span>
           <select bind:value={retuneRange}>
             <option value={0}>Exact pitch only</option>
             <option value={1}>± 1 semitone</option>
             <option value={2}>± 2 semitones</option>
+            <option value={3}>± 3 semitones</option>
           </select>
         </label>
         <label>
@@ -216,7 +268,7 @@
         the raga's <strong>vadi</strong> {fmt(weights.vadi)}, <strong>samvadi</strong> {fmt(weights.samvadi)},
         then other notes the raga uses (Pa {fmt(weights.other.P ?? 0)}, Ma {fmt(weights.other.m ?? 0)}, Ga/Dha {fmt(weights.other.G ?? 0)}, Re/Ni {fmt(weights.other.R ?? 0)}).
         Omitted notes, and notes a minor 2nd, tritone or major 7th above Sa, score 0.
-        Every combination of up to {maxK} tunings is tried; the kit covering the most songs, then the highest total score, wins.
+        Every combination of {ownedMode ? 'your drums' : `up to ${maxK} tunings`} is tried; the kit covering the most songs, then the highest total score, wins.
       </p>
     {/if}
   </section>
