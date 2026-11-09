@@ -18,7 +18,8 @@ The optimizer then brute-forces every combination of candidate drums and reports
 size, the kit that covers the most songs above a threshold (default 0.70) with the highest total
 score.
 
-- **No drums entered:** any of the 12 tunings may be suggested (up to 4 drums).
+- **No drums entered:** any of the 12 tunings may be suggested — as many as the set needs, so a
+  Sa-only threshold over songs in seven keys recommends seven dayans.
 - **Your dayans entered:** only those drums are considered. A drum's range (fixed, ±1, ±2, ±3
   semitones) is how far it can be *set* before the session; it then stays at one pitch for every
   song — no retuning between songs is assumed. If the drums can't cover the set, the tool names

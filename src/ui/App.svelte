@@ -29,7 +29,8 @@
   let copied = $state(false);
 
   const weights = DEFAULT_WEIGHTS;
-  const maxK = 4;
+  /** Every one of the 12 tunings may be needed — e.g. a Sa-only threshold over a set in many keys. */
+  const maxK = 12;
 
   const ownedMode = $derived(drums.length > 0);
   const candidates = $derived<Dayan[]>(ownedMode ? drums : anyDayan());
@@ -265,7 +266,7 @@
         then any other vadi {fmt(weights.vadi)} / samvadi {fmt(weights.samvadi)}; then remaining notes
         (Ga/Dha {fmt(weights.other.G ?? 0)}, Re/Ni {fmt(weights.other.R ?? 0)}).
         Omitted notes, and notes a minor 2nd, tritone or major 7th above Sa, score 0.
-        Every combination of {ownedMode ? 'your drums' : `up to ${maxK} tunings`} is tried; the kit covering the most songs, then the highest total score, wins.
+        Every combination of {ownedMode ? 'your drums' : `the ${maxK} tunings`} is tried; the kit covering the most songs, then the highest total score, wins.
       </p>
     {/if}
   </section>

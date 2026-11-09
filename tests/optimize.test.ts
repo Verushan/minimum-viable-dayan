@@ -7,7 +7,7 @@ import type { Dayan, OptimizeOptions, PitchClass, Song } from '../src/engine/typ
 
 const P = (n: string) => parsePitch(n)!;
 const D = (n: string, range = 0): Dayan => ({ pitch: P(n), range });
-const opts: OptimizeOptions = { threshold: 0.7, maxK: 4 };
+const opts: OptimizeOptions = { threshold: 0.7, maxK: 12 };
 const ANY = anyDayan();
 const names = (kit: { tuned: { tunedTo: PitchClass }[] }) => kit.tuned.map((t) => pitchName(t.tunedTo, 'sharp')).sort();
 
@@ -185,5 +185,24 @@ describe('singer key-shift suggestions', () => {
     const ctx = buildContexts(songs, RAGA_MAP, W);
     const kit = minimumKit(ctx, ANY, opts)!;
     expect(suggestKeyShifts(ctx, ANY, kit, W, opts)).toEqual([]);
+  });
+});
+
+describe('strictest threshold (Sa only)', () => {
+  const saOnly: OptimizeOptions = { threshold: 1, maxK: 12 };
+  const keys = ['A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A'];
+
+  it('needs one Sa dayan per distinct key, beyond the old cap of 4', () => {
+    const songs: Song[] = keys.slice(0, 7).map((k, i) => ({ name: `S${i}`, sa: P(k), ragaId: 'yaman' }));
+    const kit = minimumKit(buildContexts(songs, RAGA_MAP, W), ANY, saOnly)!;
+    expect(kit.k).toBe(7);
+    expect(kit.assignments.every((a) => a.option.reason === 'Sa')).toBe(true);
+  });
+
+  it('can recommend all 12 dayans when the set uses every key', () => {
+    const songs: Song[] = keys.map((k, i) => ({ name: `S${i}`, sa: P(k), ragaId: 'kafi' }));
+    const kit = minimumKit(buildContexts(songs, RAGA_MAP, W), ANY, saOnly)!;
+    expect(kit.k).toBe(12);
+    expect(names(kit)).toEqual([...keys].sort());
   });
 });

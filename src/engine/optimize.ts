@@ -150,9 +150,16 @@ export function suggestKeyShifts(
           return;
         }
       } else if (kit.complete) {
-        // Could the whole set be covered with fewer drums?
-        const r = minimumKit(shifted, candidates, opts);
-        if (r && r.k < kit.k) {
+        // Could the whole set be covered with fewer drums? Best-of-size coverage only grows with
+        // size, so checking k-1 first is enough to rule a shift out; then walk down to the minimum.
+        if (kit.k < 2) continue;
+        let r = bestKitOfSize(shifted, candidates, kit.k - 1, opts);
+        if (r.complete) {
+          for (let k = kit.k - 2; k >= 1; k--) {
+            const smaller = bestKitOfSize(shifted, candidates, k, opts);
+            if (!smaller.complete) break;
+            r = smaller;
+          }
           out.push({ songIndex: i, from: ctx.song.sa, to, shift, kit: r, effect: 'fewer-drums' });
           return;
         }
