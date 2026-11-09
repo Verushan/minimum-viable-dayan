@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { preferredFifth, rankDayans, scorePitch } from '../src/engine/scoring';
+import { fifthHint, preferredFifth, rankDayans, scorePitch } from '../src/engine/scoring';
 import { parsePitch, pitchOf } from '../src/engine/pitch';
 import { RAGA_MAP } from '../src/data/ragas';
 import { DEFAULT_WEIGHTS as W } from '../src/data/weights';
@@ -80,5 +80,24 @@ describe('rankDayans', () => {
     const ranked = rankDayans(song('bhupali'), raga('bhupali'), W); // S R G P D; vadi G, samvadi D
     expect(ranked.map((o) => o.reason)).toEqual(['Sa', 'Pa', 'Vadi', 'Samvadi', 'Other']);
     expect(ranked.every((o) => o.score > 0)).toBe(true);
+  });
+});
+
+describe('fifthHint', () => {
+  it('suggests Pa when Pa is vadi/samvadi', () => {
+    expect(fifthHint(raga('kafi'))).toEqual({ swara: 'P', why: 'vadi of Kafi' });
+    expect(fifthHint(raga('des'))).toEqual({ swara: 'P', why: 'samvadi of Des' });
+  });
+  it('suggests Ma when Ma is vadi/samvadi', () => {
+    expect(fifthHint(raga('bhairavi'))).toEqual({ swara: 'm', why: 'vadi of Bhairavi' });
+  });
+  it('suggests Ma when Pa is omitted', () => {
+    expect(fifthHint(raga('malkauns'))?.swara).toBe('m'); // also its vadi
+    expect(fifthHint(raga('natakurinji'))).toEqual({ swara: 'm', why: 'Natakurinji omits Pa' });
+  });
+  it('says nothing when neither is part of the raga signature', () => {
+    expect(fifthHint(raga('yaman'))).toBeUndefined();
+    expect(fifthHint(raga('bhupali'))).toBeUndefined();
+    expect(fifthHint(raga('marwa'))).toBeUndefined();
   });
 });

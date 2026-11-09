@@ -76,7 +76,15 @@ button:disabled { opacity: 0.4; cursor: default; }
 @media (min-width: 481px) { .add-drum select, .add-drum button { flex: 0 0 auto; } }
 
 /* Song cards */
-.songs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.songs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.songs > .card:first-child { margin-bottom: 0; }
+.insert-gap { display: flex; justify-content: center; }
+.insert-gap button {
+  min-height: 32px; padding: 2px 14px; font-size: 0.8rem; color: var(--muted);
+  background: transparent; border: 1px dashed transparent; border-radius: 999px;
+}
+.insert-gap button:hover, .insert-gap button:focus-visible { border-color: var(--line); color: var(--fg); }
+.fifth-hint { margin-top: 8px; font-size: 0.85rem; color: var(--accent); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 .card-head { display: flex; align-items: center; gap: 8px; }
 .card-head .num { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1.4em; text-align: right; }

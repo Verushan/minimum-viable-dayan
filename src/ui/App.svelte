@@ -2,9 +2,10 @@
   import { RAGA_MAP } from '../data/ragas';
   import { DEFAULT_WEIGHTS } from '../data/weights';
   import {
-    ALL_PITCHES, SWARA_LABEL, anyDayan, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition, suggestKeyShifts,
+    ALL_PITCHES, SWARA_LABEL, anyDayan, fifthHint, pitchOf, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition, suggestKeyShifts,
     type Dayan, type KeyShift, type KitResult, type PitchClass, type Song,
   } from '../engine';
+  import { tick } from 'svelte';
   import RagaPicker from './RagaPicker.svelte';
   import Resolution from './Resolution.svelte';
   import { load, parseState, save, shareUrl } from './persist';
@@ -49,13 +50,13 @@
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
 
-  function addSong() {
-    const last = songs.at(-1);
-    songs.push({ name: '', sa: last?.sa ?? 1, ragaId: last?.ragaId ?? 'unknown' });
-    queueMicrotask(() => {
-      const inputs = document.querySelectorAll<HTMLInputElement>('.song-name');
-      inputs[inputs.length - 1]?.focus();
-    });
+  /** Insert a blank song at position `at` (default: the end), copying Sa and raga from the song before it. */
+  async function insertSong(at = songs.length) {
+    const prev = songs[at - 1];
+    songs.splice(at, 0, { name: '', sa: prev?.sa ?? 1, ragaId: prev?.ragaId ?? 'unknown' });
+    selectedK = null;
+    await tick();
+    document.querySelector<HTMLInputElement>(`.song-name[data-index="${at}"]`)?.focus();
   }
   function removeSong(i: number) { songs.splice(i, 1); }
   function move(i: number, d: number) {
@@ -119,10 +120,16 @@
         {@const raga = RAGA_MAP.get(song.ragaId)!}
         {@const ranked = rankDayans(song, raga, weights)}
         {@const chosen = shown?.assignments[i]}
+        {@const hint = fifthHint(raga)}
+        {#if i > 0}
+          <li class="insert-gap no-print">
+            <button onclick={() => insertSong(i)} aria-label="Insert song before song {i + 1}">+ Insert song here</button>
+          </li>
+        {/if}
         <li class="card">
           <div class="card-head">
             <span class="num">{i + 1}</span>
-            <input class="song-name" bind:value={song.name} placeholder="Song name" aria-label="Song name" />
+            <input class="song-name" data-index={i} bind:value={song.name} placeholder="Song name" aria-label="Song name" />
             <div class="row-actions no-print">
               <button class="ghost" onclick={() => move(i, -1)} disabled={i === 0} title="Move up" aria-label="Move up">↑</button>
               <button class="ghost" onclick={() => move(i, 1)} disabled={i === songs.length - 1} title="Move down" aria-label="Move down">↓</button>
@@ -151,11 +158,16 @@
               </span>
             {/each}
           </div>
+          {#if hint}
+            <div class="fifth-hint">
+              ♪ {hint.swara === 'P' ? 'Pa' : 'Ma'} ({pn(pitchOf(song.sa, hint.swara))}) may sound better than Sa — {hint.why}
+            </div>
+          {/if}
         </li>
       {/each}
     </ol>
     <div class="toolbar no-print">
-      <button class="primary big" onclick={addSong}>+ Add song</button>
+      <button class="primary big" onclick={() => insertSong()}>+ Add song</button>
       <button onclick={openJson}>Import / export</button>
       <button onclick={copyLink}>{copied ? 'Copied!' : 'Share link'}</button>
       <button onclick={() => print()}>Print</button>

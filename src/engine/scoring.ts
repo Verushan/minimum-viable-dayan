@@ -16,6 +16,29 @@ export function preferredFifth(raga: Raga): Swara | undefined {
   return undefined;
 }
 
+export interface FifthHint {
+  swara: 'P' | 'm';
+  /** Short reason, e.g. "vadi of Malkauns" or "Kalavati omits Ma". */
+  why: string;
+}
+
+/**
+ * Whether a dayan on Pa or Ma is worth trying instead of Sa for this raga: when Pa or Ma is the
+ * raga's vadi/samvadi, or when the raga omits Pa and keeps Ma. Informational only — Sa still
+ * scores highest.
+ */
+export function fifthHint(raga: Raga): FifthHint | undefined {
+  const role = (s: Swara) => (raga.vadi === s ? 'vadi' : raga.samvadi === s ? 'samvadi' : undefined);
+  const hasPa = raga.swaras.includes('P');
+  const hasMa = raga.swaras.includes('m');
+  const pa = role('P');
+  const ma = role('m');
+  if (hasPa && pa) return { swara: 'P', why: `${pa} of ${raga.name}` };
+  if (hasMa && ma) return { swara: 'm', why: `${ma} of ${raga.name}` };
+  if (!hasPa && hasMa) return { swara: 'm', why: `${raga.name} omits Pa` };
+  return undefined;
+}
+
 /** Score a single absolute pitch as a dayan tuning for `song` in `raga`. */
 export function scorePitch(song: Song, raga: Raga, pitch: PitchClass, w: Weights): DayanOption {
   const swara = swaraAt(song.sa, pitch);

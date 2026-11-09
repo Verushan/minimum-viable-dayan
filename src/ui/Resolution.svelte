@@ -1,6 +1,6 @@
 <script lang="ts">
   import { RAGA_MAP } from '../data/ragas';
-  import { SWARA_LABEL, pitchName, type KeyShift, type KitResult, type PitchClass, type Suggestion } from '../engine';
+  import { SWARA_LABEL, fifthHint, pitchName, pitchOf, type KeyShift, type KitResult, type PitchClass, type Suggestion } from '../engine';
 
   let { kit, suggestion, keyShifts, threshold, nameStyle, isMinimum, ownedMode, onapplyshift }: {
     kit: KitResult;
@@ -71,11 +71,18 @@
     {#each kit.assignments as a, i}
       {@const compromise = a.option.reason !== 'Sa'}
       {@const weak = a.option.score < threshold}
+      {@const hint = fifthHint(RAGA_MAP.get(a.song.ragaId)!)}
+      {@const hintPitch = hint ? pitchOf(a.song.sa, hint.swara) : undefined}
       <li class:compromise class:weak>
         <span class="num">{i + 1}</span>
         <span class="who">
           <span class="song">{a.song.name || 'Untitled'}</span>
           <span class="meta">Sa {pn(a.song.sa)} · {RAGA_MAP.get(a.song.ragaId)?.name}</span>
+          {#if hint && hintPitch !== undefined && hintPitch !== a.tuned.tunedTo}
+            <span class="hint">
+              Try {hint.swara === 'P' ? 'Pa' : 'Ma'} ({pn(hintPitch)}) — {hint.why}{#if kit.tuned.some((t) => t.tunedTo === hintPitch)}; you're bringing it{/if}
+            </span>
+          {/if}
         </span>
         <span class="drum">
           <span class="drum-pitch">{pn(a.tuned.tunedTo)}</span>
@@ -131,6 +138,7 @@
   .who { display: flex; flex-direction: column; min-width: 0; }
   .song { font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
   .meta { font-size: 0.85rem; color: var(--muted); }
+  .hint { font-size: 0.8rem; color: var(--accent); }
   .drum { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
   .drum-pitch { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
   .drum-how { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }

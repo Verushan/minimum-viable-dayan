@@ -24,6 +24,8 @@ score.
   semitones) is how far it can be *set* before the session; it then stays at one pitch for every
   song — no retuning between songs is assumed. If the drums can't cover the set, the tool names
   the single extra drum that would help most.
+- **Pa/Ma hints:** when Pa or Ma is the raga's vadi/samvadi, or the raga omits Pa, the song
+  card and final setlist note that a Pa or Ma dayan may sound better than Sa for that song.
 - **Singer adjustments:** for each song, the tool checks whether moving its Sa a semitone up or
   down would let the current drums cover it, or would reduce the number of drums needed, and
   offers the change with one tap.
