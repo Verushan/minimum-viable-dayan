@@ -35,6 +35,12 @@ describe('raga dataset', () => {
       if (raga.vadi) expect(raga.swaras).toContain(raga.vadi);
       if (raga.samvadi) expect(raga.swaras).toContain(raga.samvadi);
       if (raga.vadi && raga.samvadi) expect(raga.vadi).not.toBe(raga.samvadi);
+      if (raga.pakad) {
+        expect(raga.pakad).toMatch(/^[\sSrRgGmMPdDnN*,]+$/);
+        // Ragakosh's Basant Mukhari pakad dips to a lower-octave shuddha Ni as a grace note.
+        const allowed = new Set([...raga.swaras, ...(raga.id === 'basant-mukhari' ? ['N'] : [])]);
+        for (const n of raga.pakad.match(/[SrRgGmMPdDnN]/g) ?? []) expect(allowed, `${raga.name} pakad note ${n}`).toContain(n);
+      }
     });
   }
 });

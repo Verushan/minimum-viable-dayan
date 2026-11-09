@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { fifthHint, preferredFifth, rankDayans, scorePitch } from '../src/engine/scoring';
+import { fifthHint, pakadRests, preferredFifth, rankDayans, scorePitch } from '../src/engine/scoring';
 import { parsePitch, pitchOf } from '../src/engine/pitch';
 import { RAGA_MAP } from '../src/data/ragas';
-import { DEFAULT_WEIGHTS as W } from '../src/data/weights';
+import { BEST_NOTE_WEIGHTS as BEST, DEFAULT_WEIGHTS as W } from '../src/data/weights';
 import type { Song } from '../src/engine/types';
 
 const raga = (id: string) => RAGA_MAP.get(id)!;
@@ -18,9 +18,17 @@ describe('preferredFifth', () => {
   it('Ma when Pa is absent', () => {
     expect(preferredFifth(raga('malkauns'))).toBe('m');
   });
-  it('Ma when Pa is present but not emphasised', () => {
-    expect(preferredFifth(raga('bhairavi'))).toBe('m');
-    expect(preferredFifth(raga('bilawal'))).toBe('m'); // vadi D, samvadi G
+  it('Ma when Ma is vadi/samvadi, even if the pakad rests on Pa', () => {
+    expect(pakadRests(raga('bhairavi')).P).toBeGreaterThan(0);
+    expect(preferredFifth(raga('bhairavi'))).toBe('m'); // vadi m
+  });
+  it('the pakad decides when neither is vadi/samvadi', () => {
+    expect(preferredFifth(raga('bilawal'))).toBe('P'); // pakad "… G P D P, …" rests on Pa
+    expect(preferredFifth(raga('basant-mukhari'))).toBe('m'); // pakad rests on Ma five times
+  });
+  it('Ma when Pa is present but neither is emphasised nor favoured by the pakad', () => {
+    expect(preferredFifth(raga('ahir-bhairav'))).toBe('m'); // vadi m anyway
+    expect(preferredFifth(raga('khamaj'))).toBe('m'); // no pakad recorded
   });
   it('Pa when Pa is present, unemphasised, and there is no shuddha Ma', () => {
     expect(preferredFifth(raga('yaman'))).toBe('P');
@@ -85,19 +93,42 @@ describe('rankDayans', () => {
 
 describe('fifthHint', () => {
   it('suggests Pa when Pa is vadi/samvadi', () => {
-    expect(fifthHint(raga('kafi'))).toEqual({ swara: 'P', why: 'vadi of Kafi' });
-    expect(fifthHint(raga('des'))).toEqual({ swara: 'P', why: 'samvadi of Des' });
+    expect(fifthHint(raga('kafi'))).toEqual({ swara: 'P', why: 'vadi of Kafi', strength: 'signature' });
+    expect(fifthHint(raga('des'))).toEqual({ swara: 'P', why: 'samvadi of Des', strength: 'signature' });
   });
   it('suggests Ma when Ma is vadi/samvadi', () => {
-    expect(fifthHint(raga('bhairavi'))).toEqual({ swara: 'm', why: 'vadi of Bhairavi' });
+    expect(fifthHint(raga('bhairavi'))).toEqual({ swara: 'm', why: 'vadi of Bhairavi', strength: 'signature' });
   });
   it('suggests Ma when Pa is omitted', () => {
     expect(fifthHint(raga('malkauns'))?.swara).toBe('m'); // also its vadi
-    expect(fifthHint(raga('natakurinji'))).toEqual({ swara: 'm', why: 'Natakurinji omits Pa' });
+    expect(fifthHint(raga('natakurinji'))).toEqual({ swara: 'm', why: 'Natakurinji omits Pa', strength: 'fallback' });
+  });
+  it('suggests the fifth the pakad keeps resting on', () => {
+    expect(fifthHint(raga('tilang'))).toEqual({ swara: 'P', why: 'pakad of Tilang rests on Pa', strength: 'signature' });
+    expect(fifthHint(raga('jaunpuri'))?.swara).toBe('P');
+    expect(fifthHint(raga('basant-mukhari'))?.swara).toBe('m');
+    // A single resting phrase is not enough for a hint (Bilawal rests on Pa once).
+    expect(fifthHint(raga('bilawal'))).toBeUndefined();
   });
   it('says nothing when neither is part of the raga signature', () => {
     expect(fifthHint(raga('yaman'))).toBeUndefined();
     expect(fifthHint(raga('bhupali'))).toBeUndefined();
     expect(fifthHint(raga('marwa'))).toBeUndefined();
+  });
+});
+
+describe('best-note mode', () => {
+  it('puts a signature Pa/Ma above Sa', () => {
+    const k = (sw: Parameters<typeof pitchOf>[1]) => scorePitch(song('kafi'), raga('kafi'), pitchOf(CS, sw), BEST);
+    expect(k('P').score).toBe(1);
+    expect(k('S').score).toBe(BEST.saWhenSignature);
+    expect(rankDayans(song('kafi'), raga('kafi'), BEST)[0]!.reason).toBe('Pa');
+  });
+  it('leaves Sa on top when the raga has no signature fifth', () => {
+    expect(rankDayans(song('yaman'), raga('yaman'), BEST)[0]!.reason).toBe('Sa');
+    expect(scorePitch(song('yaman'), raga('yaman'), CS, BEST).score).toBe(1);
+  });
+  it('does not promote the weak "omits Pa" fallback', () => {
+    expect(rankDayans(song('natakurinji'), raga('natakurinji'), BEST)[0]!.reason).toBe('Sa');
   });
 });

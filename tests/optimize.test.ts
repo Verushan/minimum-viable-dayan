@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { anyDayan, buildContexts, bestKitOfSize, kitTradeoff, minimumKit, suggestAddition, suggestKeyShifts } from '../src/engine/optimize';
 import { parsePitch, pitchName } from '../src/engine/pitch';
 import { RAGA_MAP } from '../src/data/ragas';
-import { DEFAULT_WEIGHTS as W } from '../src/data/weights';
+import { BEST_NOTE_WEIGHTS, DEFAULT_WEIGHTS as W } from '../src/data/weights';
 import type { Dayan, OptimizeOptions, PitchClass, Song } from '../src/engine/types';
 
 const P = (n: string) => parsePitch(n)!;
@@ -204,5 +204,20 @@ describe('strictest threshold (Sa only)', () => {
     const kit = minimumKit(buildContexts(songs, RAGA_MAP, W), ANY, saOnly)!;
     expect(kit.k).toBe(12);
     expect(names(kit)).toEqual([...keys].sort());
+  });
+});
+
+describe('best-note mode in the optimizer', () => {
+  it('lets a signature Pa share a drum at full score', () => {
+    const songs: Song[] = [
+      { name: 'A', sa: P('D'), ragaId: 'kafi' }, // vadi Pa = A
+      { name: 'B', sa: P('A'), ragaId: 'yaman' },
+    ];
+    const strict: OptimizeOptions = { threshold: 1, maxK: 12 };
+    expect(minimumKit(buildContexts(songs, RAGA_MAP, W), ANY, strict)!.k).toBe(2);
+    const kit = minimumKit(buildContexts(songs, RAGA_MAP, BEST_NOTE_WEIGHTS), ANY, strict)!;
+    expect(kit.k).toBe(1);
+    expect(names(kit)).toEqual(['A']);
+    expect(kit.totalScore).toBe(2);
   });
 });

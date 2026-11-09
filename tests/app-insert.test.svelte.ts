@@ -29,4 +29,28 @@ describe('App song list', () => {
     unmount(app);
     target.remove();
   });
+
+  it("ranks Malkauns' Ma above Sa in best-note mode", () => {
+    location.hash = '';
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const app = mount(App, { target });
+    flushSync();
+
+    const malkaunsCard = () => target.querySelectorAll('.card')[1]!;
+    const firstPill = () => malkaunsCard().querySelector('.options-row .pill small')!.textContent;
+    expect(firstPill()).toBe('Sa');
+    expect(malkaunsCard().querySelector('.fifth-hint')!.textContent).toContain('may sound better than Sa');
+
+    const best = [...target.querySelectorAll<HTMLButtonElement>('.segmented button')].find((b) => b.textContent!.includes('best note'))!;
+    best.click();
+    flushSync();
+    expect(firstPill()).toBe('Ma');
+    expect(malkaunsCard().querySelector('.fifth-hint')!.textContent).toContain('is ranked above Sa');
+    // Yaman has no signature fifth, so it still prefers Sa.
+    expect(target.querySelectorAll('.card')[0]!.querySelector('.options-row .pill small')!.textContent).toBe('Sa');
+
+    unmount(app);
+    target.remove();
+  });
 });

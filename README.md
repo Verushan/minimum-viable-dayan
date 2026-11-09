@@ -8,7 +8,7 @@ as a dayan tuning:
 | Tier | Weight | Condition |
 |---|---|---|
 | Sa | 1.00 | always |
-| Pa *or* Ma | 0.85 | Pa if the raga has it as vadi/samvadi; otherwise shuddha Ma if present; otherwise Pa if present |
+| Pa *or* Ma | 0.85 | Pa if it is vadi/samvadi; Ma if it is; otherwise whichever the pakad rests on more; otherwise Ma if present, else Pa |
 | the other of Pa/Ma | 0.60 | when the raga has it |
 | Vadi / Samvadi | 0.50 / 0.45 | any other emphasised note |
 | Other | 0.30 Ga/Dha · 0.15 Re/Ni | any other note the raga uses |
@@ -24,13 +24,16 @@ score.
   semitones) is how far it can be *set* before the session; it then stays at one pitch for every
   song — no retuning between songs is assumed. If the drums can't cover the set, the tool names
   the single extra drum that would help most.
+- **Dayan preference:** *Sa first* (default), or *Raga's best note*, where a Pa/Ma that is the
+  raga's vadi/samvadi — or where its pakad repeatedly rests — scores 1.00 and Sa 0.95.
 - **Pa/Ma hints:** when Pa or Ma is the raga's vadi/samvadi, or the raga omits Pa, the song
   card and final setlist note that a Pa or Ma dayan may sound better than Sa for that song.
 - **Singer adjustments:** for each song, the tool checks whether moving its Sa a semitone up or
   down would let the current drums cover it, or would reduce the number of drums needed, and
   offers the change with one tap.
 
-Weights live in `src/data/weights.ts`; ragas in `src/data/ragas.ts` (add entries there — a test
+Weights live in `src/data/weights.ts`; ragas in `src/data/ragas.ts` (pakads sourced from
+ragakosh.com) (add entries there — a test
 validates every entry).
 
 ## Develop

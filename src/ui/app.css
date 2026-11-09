@@ -84,6 +84,10 @@ button:disabled { opacity: 0.4; cursor: default; }
   background: transparent; border: 1px dashed transparent; border-radius: 999px;
 }
 .insert-gap button:hover, .insert-gap button:focus-visible { border-color: var(--line); color: var(--fg); }
+.pakad { font-family: ui-monospace, monospace; font-size: 0.8rem; color: var(--fg); overflow-wrap: anywhere; }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; background: var(--card); max-width: 100%; }
+.segmented button { border: 0; background: transparent; border-radius: 7px; padding: 8px 14px; color: var(--muted); }
+.segmented button.on { background: var(--accent); color: white; font-weight: 600; }
 .fifth-hint { margin-top: 8px; font-size: 0.85rem; color: var(--accent); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 .card-head { display: flex; align-items: center; gap: 8px; }

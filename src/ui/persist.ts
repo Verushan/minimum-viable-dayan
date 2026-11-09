@@ -6,6 +6,8 @@ export interface SavedState {
   /** Drums the player owns; empty means "any tuning may be suggested". */
   drums: Dayan[];
   threshold: number;
+  /** 'sa' ranks Sa first; 'best' lets a raga's signature Pa/Ma outrank Sa. */
+  prefer: 'sa' | 'best';
 }
 
 const LS_KEY = 'mvd:state';
@@ -33,6 +35,7 @@ export function parseState(raw: unknown): SavedState | undefined {
     songs: r.songs.map((s) => ({ name: s.name, sa: s.sa, ragaId: s.ragaId })),
     drums: drums.map((d) => ({ pitch: d.pitch, range: d.range })),
     threshold: typeof r.threshold === 'number' ? r.threshold : 0.7,
+    prefer: r.prefer === 'best' ? 'best' : 'sa',
   };
 }
 

@@ -22,3 +22,6 @@ export const DEFAULT_WEIGHTS: Weights = {
   },
   forbiddenIntervals: [1, 6, 11],
 };
+
+/** "Best note" mode: the raga's signature Pa/Ma outranks Sa, which stays a near-perfect fit. */
+export const BEST_NOTE_WEIGHTS: Weights = { ...DEFAULT_WEIGHTS, saWhenSignature: 0.95 };

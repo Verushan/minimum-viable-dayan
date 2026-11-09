@@ -1,6 +1,6 @@
 <script lang="ts">
   import { RAGA_MAP } from '../data/ragas';
-  import { DEFAULT_WEIGHTS } from '../data/weights';
+  import { BEST_NOTE_WEIGHTS, DEFAULT_WEIGHTS } from '../data/weights';
   import {
     ALL_PITCHES, SWARA_LABEL, anyDayan, fifthHint, pitchOf, buildContexts, kitTradeoff, pitchName, rankDayans, suggestAddition, suggestKeyShifts,
     type Dayan, type KeyShift, type KitResult, type PitchClass, type Song,
@@ -19,6 +19,7 @@
   ]);
   let drums = $state<Dayan[]>(initial?.drums ?? []);
   let threshold = $state(initial?.threshold ?? 0.7);
+  let prefer = $state<'sa' | 'best'>(initial?.prefer ?? 'sa');
   let newDrumPitch = $state<PitchClass>(1);
   let newDrumRange = $state(0);
   let nameStyle = $state<'sharp' | 'flat'>('sharp');
@@ -29,7 +30,7 @@
   let jsonError = $state('');
   let copied = $state(false);
 
-  const weights = DEFAULT_WEIGHTS;
+  const weights = $derived(prefer === 'best' ? BEST_NOTE_WEIGHTS : DEFAULT_WEIGHTS);
   /** Every one of the 12 tunings may be needed — e.g. a Sa-only threshold over a set in many keys. */
   const maxK = 12;
 
@@ -45,7 +46,7 @@
   const suggestion = $derived(shown && !shown.complete ? suggestAddition(contexts, shown, opts) : undefined);
   const keyShifts = $derived<KeyShift[]>(shown ? suggestKeyShifts(contexts, candidates, shown, weights, opts) : []);
 
-  $effect(() => { save({ songs, drums, threshold }); });
+  $effect(() => { save({ songs, drums, threshold, prefer }); });
 
   const pn = (p: PitchClass) => pitchName(p, nameStyle);
   const fmt = (n: number) => n.toFixed(2);
@@ -80,7 +81,7 @@
   }
 
   function openJson() {
-    jsonText = JSON.stringify({ songs, drums, threshold }, null, 2);
+    jsonText = JSON.stringify({ songs, drums, threshold, prefer }, null, 2);
     jsonError = '';
     showJson = true;
   }
@@ -91,13 +92,14 @@
       songs = parsed.songs;
       drums = parsed.drums;
       threshold = parsed.threshold;
+      prefer = parsed.prefer;
       showJson = false;
     } catch (e) {
       jsonError = (e as Error).message;
     }
   }
   async function copyLink() {
-    await navigator.clipboard.writeText(shareUrl({ songs, drums, threshold }));
+    await navigator.clipboard.writeText(shareUrl({ songs, drums, threshold, prefer }));
     copied = true;
     setTimeout(() => (copied = false), 1500);
   }
@@ -149,6 +151,7 @@
             </label>
           </div>
           {#if raga.notes}<div class="raga-note">{raga.notes}</div>{/if}
+          {#if raga.pakad}<div class="raga-note">Pakad: <span class="pakad">{raga.pakad}</span></div>{/if}
           <div class="options-row">
             <span class="muted">Dayan options:</span>
             {#each ranked as o}
@@ -160,7 +163,8 @@
           </div>
           {#if hint}
             <div class="fifth-hint">
-              ♪ {hint.swara === 'P' ? 'Pa' : 'Ma'} ({pn(pitchOf(song.sa, hint.swara))}) may sound better than Sa — {hint.why}
+              ♪ {hint.swara === 'P' ? 'Pa' : 'Ma'} ({pn(pitchOf(song.sa, hint.swara))})
+              {prefer === 'best' && hint.strength === 'signature' ? 'is ranked above Sa' : 'may sound better than Sa'} — {hint.why}
             </div>
           {/if}
         </li>
@@ -219,6 +223,23 @@
     </div>
   </section>
 
+  <section class="no-print">
+    <h2>Dayan preference</h2>
+    <div class="segmented" role="radiogroup" aria-label="Dayan preference">
+      <button role="radio" aria-checked={prefer === 'sa'} class:on={prefer === 'sa'} onclick={() => { prefer = 'sa'; selectedK = null; }}>
+        Sa first
+      </button>
+      <button role="radio" aria-checked={prefer === 'best'} class:on={prefer === 'best'} onclick={() => { prefer = 'best'; selectedK = null; }}>
+        Raga's best note
+      </button>
+    </div>
+    <p class="muted small">
+      {prefer === 'sa'
+        ? 'Every song prefers a dayan on its Sa; Pa or Ma is the fallback.'
+        : 'Where Pa or Ma is part of the raga’s signature (vadi, samvadi, or where its pakad rests), that note is preferred over Sa. Other songs still prefer Sa.'}
+    </p>
+  </section>
+
   {#if !songs.length}
     <p class="muted">Add a song to get started.</p>
   {:else if shown}
@@ -261,7 +282,7 @@
         <label>
           <span>Minimum acceptable score per song</span>
           <input type="range" min="0.3" max="1" step="0.05" bind:value={threshold} />
-          <span>{fmt(threshold)} {threshold > weights.preferredFifth ? '(Sa only)' : threshold > weights.otherFifth ? '(Sa, or the raga\'s Pa/Ma)' : threshold > weights.vadi ? '(Sa, Pa or Ma)' : ''}</span>
+          <span>{fmt(threshold)} {threshold > weights.preferredFifth ? (prefer === 'best' ? '(best note only)' : '(Sa only)') : threshold > weights.otherFifth ? '(Sa, or the raga\'s Pa/Ma)' : threshold > weights.vadi ? '(Sa, Pa or Ma)' : ''}</span>
         </label>
         <label>
           <span>Note names</span>
@@ -273,10 +294,12 @@
       </div>
       <p class="muted small">
         Each pitch is scored as a dayan tuning per song: <strong>Sa</strong> {fmt(weights.sa)}; then
-        <strong>Pa</strong> if the raga has it as vadi or samvadi, otherwise <strong>Ma</strong> if the raga has it
-        ({fmt(weights.preferredFifth)} — the other of the pair, when present, {fmt(weights.otherFifth)});
+        <strong>Pa or Ma</strong> {fmt(weights.preferredFifth)} — Pa if it is the raga's vadi or samvadi, Ma if Ma is,
+        otherwise whichever the raga's pakad comes to rest on more, otherwise Ma if present
+        (the other of the pair {fmt(weights.otherFifth)});
         then any other vadi {fmt(weights.vadi)} / samvadi {fmt(weights.samvadi)}; then remaining notes
         (Ga/Dha {fmt(weights.other.G ?? 0)}, Re/Ni {fmt(weights.other.R ?? 0)}).
+        {#if prefer === 'best'}In “raga's best note” mode a signature Pa/Ma scores {fmt(weights.sa)} and Sa {fmt(weights.saWhenSignature ?? weights.sa)}.{/if}
         Omitted notes, and notes a minor 2nd, tritone or major 7th above Sa, score 0.
         Every combination of {ownedMode ? 'your drums' : `the ${maxK} tunings`} is tried; the kit covering the most songs, then the highest total score, wins.
       </p>

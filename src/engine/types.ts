@@ -19,6 +19,8 @@ export interface Raga {
    * "Carnatic/Hindustani" labels used by bhajan books — so imports can resolve them.
    */
   aliases?: string[];
+  /** Characteristic phrase(s), same notation as swaras; commas separate phrases. */
+  pakad?: string;
   notes?: string;
 }
 
@@ -49,6 +51,11 @@ export interface DayanOption {
  */
 export interface Weights {
   sa: number;
+  /**
+   * When set, a Pa or Ma that is part of the raga's signature (vadi/samvadi, or where the pakad
+   * comes to rest) scores `sa`, and Sa drops to this value — the "best note" mode.
+   */
+  saWhenSignature?: number;
   /** Pa when it is vadi/samvadi, or Ma when Pa is absent or not emphasised. */
   preferredFifth: number;
   /** The other of Pa/Ma when the raga has it but it is not the preferred one. */
